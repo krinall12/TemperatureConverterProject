@@ -15,11 +15,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-test:
+  source:
     runs-on: ubuntu-latest
     steps:
-      - name: Get the code (Source)
+      - name: Get the latest code from GitHub
         uses: actions/checkout@v4
+
+      - name: Show which commit triggered the pipeline
+        run: |
+          git log -1
+          ls
+
+  build:
+    needs: source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -28,8 +39,24 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build and run the tests (Build + Test)
-        run: mvn -B package
+      - name: Compile the code
+        run: mvn -B compile
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run the JUnit tests
+        run: mvn -B test
 
       - name: Make the website folder
         run: |
@@ -56,12 +83,12 @@ jobs:
           path: _site
 
   deploy:
-    needs: build-and-test
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages (Deploy)
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
